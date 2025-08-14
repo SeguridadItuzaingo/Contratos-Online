@@ -21,4 +21,5 @@ ENV PYTHONUNBUFFERED=1 \
 EXPOSE 10000
 
 # Ejecutar la app con Gunicorn
-CMD ["gunicorn", "-b", "0.0.0.0:10000", "app:app"]
+CMD ["sh", "-c", "gunicorn -b 0.0.0.0:${PORT} app:app"]
+
