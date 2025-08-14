@@ -204,9 +204,14 @@ def _add_signatures_section(doc: Document, firma_cliente_path: str, firma_empres
 
 def _export_to_pdf_safe(out_docx: str, out_pdf: str) -> bool:
     """
-    Convierte DOCX -> PDF. Devuelve True si el PDF quedó bien.
-    Requiere Windows + Word para docx2pdf. Si falla, devolvemos False.
+    Convierte DOCX -> PDF.
+    1) Intenta docx2pdf (Word/Win o Mac).
+    2) Intenta LibreOffice (Linux) con 'soffice' y luego 'libreoffice'.
     """
+    from sys import platform
+    ok = False
+
+    # 1) docx2pdf (Windows/Mac con Word)
     try:
         if platform.startswith("win") and HAS_PYTHONCOM:
             try:
@@ -214,15 +219,38 @@ def _export_to_pdf_safe(out_docx: str, out_pdf: str) -> bool:
             except Exception:
                 pass
         convert(out_docx, out_pdf)
-        return os.path.exists(out_pdf) and os.path.getsize(out_pdf) > 0
+        ok = os.path.exists(out_pdf) and os.path.getsize(out_pdf) > 0
     except Exception:
-        return False
+        ok = False
     finally:
         if platform.startswith("win") and HAS_PYTHONCOM:
             try:
                 pythoncom.CoUninitialize()
             except Exception:
                 pass
+
+    if ok:
+        return True
+
+    # 2) LibreOffice en Linux (dos binarios posibles)
+    try:
+        import subprocess, shlex
+        out_dir = os.path.dirname(out_pdf) or "."
+        for bin_name in ("soffice", "libreoffice"):
+            cmd = f"{bin_name} --headless --convert-to pdf --outdir {shlex.quote(out_dir)} {shlex.quote(out_docx)}"
+            try:
+                subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+                gen_pdf = os.path.join(out_dir, os.path.splitext(os.path.basename(out_docx))[0] + ".pdf")
+                if os.path.exists(gen_pdf) and os.path.getsize(gen_pdf) > 0:
+                    if gen_pdf != out_pdf:
+                        os.replace(gen_pdf, out_pdf)
+                    return True
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    return False
 
 # -------------------- Rutas --------------------
 
@@ -307,8 +335,7 @@ def generar():
 
     # 5) Convertir a PDF con fallback
     pdf_ok = _export_to_pdf_safe(out_docx, out_pdf)
-    if pdf_ok:
-        session["archivo_pdf"] = out_pdf
+    session["archivo_pdf"] = out_pdf if (pdf_ok and os.path.exists(out_pdf)) else out_docx
     else:
         # No rompemos el flujo: dejamos DOCX listo para descarga/envío
         session["archivo_pdf"] = out_docx
@@ -361,4 +388,5 @@ if __name__ == "__main__":
     os.makedirs(STATIC_DIR, exist_ok=True)
     # En dev: debug=True; en prod: usar WSGI/Gunicorn
     app.run(debug=True)
+
 
