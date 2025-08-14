@@ -240,7 +240,7 @@ def generar():
     nombre = request.form.get("nombre", "").strip()
     dni = request.form.get("dni", "").strip()
     direccion = request.form.get("direccion", "").strip()
-    email = request.form.get("email", "").strip()
+    email = (request.form.get("email") or request.form.get("correo") or request.form.get("mail") or "").strip()
     ubicacion = (request.form.get("ubicacion_monitoreo") or request.form.get("ubicacion") or "").strip()
     firma_b64 = (request.form.get("firmaBase64") or request.form.get("firma") or "").strip()
 
@@ -361,3 +361,4 @@ if __name__ == "__main__":
     os.makedirs(STATIC_DIR, exist_ok=True)
     # En dev: debug=True; en prod: usar WSGI/Gunicorn
     app.run(debug=True)
+
