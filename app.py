@@ -204,54 +204,41 @@ def _add_signatures_section(doc: Document, firma_cliente_path: str, firma_empres
 
 def _export_to_pdf_safe(out_docx: str, out_pdf: str) -> bool:
     """
-    Convierte DOCX -> PDF.
-    1) Intenta docx2pdf (Word/Win o Mac).
-    2) Intenta LibreOffice (Linux) con 'soffice' y luego 'libreoffice'.
+    Convierte DOCX -> PDF usando LibreOffice en Linux.
+    - Intenta 'soffice' y 'libreoffice'
+    - Fuerza perfil/headless y locale
     """
-    from sys import platform
-    ok = False
+    import subprocess, shlex, os
 
-    # 1) docx2pdf (Windows/Mac con Word)
-    try:
-        if platform.startswith("win") and HAS_PYTHONCOM:
-            try:
-                pythoncom.CoInitialize()
-            except Exception:
-                pass
-        convert(out_docx, out_pdf)
-        ok = os.path.exists(out_pdf) and os.path.getsize(out_pdf) > 0
-    except Exception:
-        ok = False
-    finally:
-        if platform.startswith("win") and HAS_PYTHONCOM:
-            try:
-                pythoncom.CoUninitialize()
-            except Exception:
-                pass
+    out_dir = os.path.dirname(out_pdf) or "."
+    # LibreOffice a veces necesita HOME/LANG para inicializar bien en contenedores
+    env = os.environ.copy()
+    env.setdefault("HOME", "/tmp")
+    env.setdefault("LANG", "en_US.UTF-8")
 
-    if ok:
-        return True
+    # Dos binarios posibles, y forzamos el filtro de Writer
+    cmds = [
+        f"soffice --headless --norestore --nolockcheck --nodefault "
+        f"--convert-to pdf:writer_pdf_Export --outdir {shlex.quote(out_dir)} {shlex.quote(out_docx)}",
+        f"libreoffice --headless --norestore --nolockcheck --nodefault "
+        f"--convert-to pdf:writer_pdf_Export --outdir {shlex.quote(out_dir)} {shlex.quote(out_docx)}"
+    ]
 
-    # 2) LibreOffice en Linux (dos binarios posibles)
-    try:
-        import subprocess, shlex
-        out_dir = os.path.dirname(out_pdf) or "."
-        for bin_name in ("soffice", "libreoffice"):
-            cmd = f"{bin_name} --headless --convert-to pdf --outdir {shlex.quote(out_dir)} {shlex.quote(out_docx)}"
-            try:
-                subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
-                gen_pdf = os.path.join(out_dir, os.path.splitext(os.path.basename(out_docx))[0] + ".pdf")
-                if os.path.exists(gen_pdf) and os.path.getsize(gen_pdf) > 0:
-                    if gen_pdf != out_pdf:
-                        os.replace(gen_pdf, out_pdf)
-                    return True
-            except Exception:
-                continue
-    except Exception:
-        pass
+    for cmd in cmds:
+        try:
+            subprocess.run(cmd, shell=True, check=True,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                           timeout=180, env=env)
+            gen_pdf = os.path.join(out_dir, os.path.splitext(os.path.basename(out_docx))[0] + ".pdf")
+            if os.path.exists(gen_pdf) and os.path.getsize(gen_pdf) > 0:
+                if gen_pdf != out_pdf:
+                    os.replace(gen_pdf, out_pdf)
+                return True
+        except Exception:
+            continue
 
     return False
-
+    
 # -------------------- Rutas --------------------
 
 @app.route("/", methods=["GET"])
@@ -292,42 +279,7 @@ def generar():
     except Exception:
         return "La imagen de la firma es inválida.", 400
 
-    # 4) Crear DOCX desde plantilla y reemplazar placeholders
-    if not os.path.exists(TEMPLATE_DOCX):
-        return "No se encontró la plantilla del contrato.", 500
-
-    doc = Document(TEMPLATE_DOCX)
-    fecha_firma = datetime.now().strftime("%d/%m/%Y")
-
-    # Soportar ambos estilos de tokens en la plantilla para evitar mismatches
-    mapping = {
-        # estilo con espacios y minúsculas
-        "{{ nombre }}": nombre,
-        "{{ dni }}": dni,
-        "{{ direccion }}": direccion,
-        "{{ email }}": email,
-        "{{ ubicacion }}": ubicacion,
-        "{{ ubicacion_monitoreo }}": ubicacion,
-        "{{ responsable_empresa }}": RESPONSABLE_EMPRESA,
-        "{{ fecha_firma }}": fecha_firma,
-
-        # estilo “corporativo” en mayúsculas sin espacios
-        "{{NOMBRE_ABONADO}}": nombre,
-        "{{DNI_ABONADO}}": dni,
-        "{{DIRECCION_ABONADO}}": direccion,
-        "{{EMAIL_ABONADO}}": email,
-        "{{UBICACION_MONITOREO}}": ubicacion,
-        "{{RESPONSABLE_EMPRESA}}": RESPONSABLE_EMPRESA,
-        "{{FECHA_FIRMA}}": fecha_firma,
-    }
-
-    _insert_text_placeholders(doc, mapping)
-
-    # Firmas
-    _ensure_company_signature(FIRMA_EMPRESA_PATH, "Alan Arndt")
-    _add_signatures_section(doc, firma_cliente_path, FIRMA_EMPRESA_PATH)
-
-    # Guardar DOCX
+        # 4) Guardar DOCX
     try:
         doc.save(out_docx)
     except Exception as e:
@@ -335,7 +287,8 @@ def generar():
 
     # 5) Convertir a PDF con fallback
     pdf_ok = _export_to_pdf_safe(out_docx, out_pdf)
-    session["archivo_pdf"] = out_pdf if (pdf_ok and os.path.exists(out_pdf)) else out_docx
+    if pdf_ok and os.path.exists(out_pdf) and os.path.getsize(out_pdf) > 0:
+        session["archivo_pdf"] = out_pdf
     else:
         # No rompemos el flujo: dejamos DOCX listo para descarga/envío
         session["archivo_pdf"] = out_docx
@@ -356,23 +309,23 @@ def generar():
             f"Email: {EMAIL_EMPRESA or '-'}\n"
         )
 
-        # Enviar al cliente
+        # Enviar al cliente (si cargó email)
         if email:
             correo_util.enviar_email(email, asunto, cuerpo, adjunto)
 
-        # Copia a la empresa
+        # Copia a la empresa (si está configurado)
         if EMAIL_EMPRESA:
             correo_util.enviar_email(
                 EMAIL_EMPRESA,
                 "Nuevo contrato firmado - Seguridad Ituzaingó",
-                f"El cliente {nombre} firmó un contrato.\n\n{cuerpo}",
+                f"El/La cliente {nombre} firmó un contrato.\n\n{cuerpo}",
                 adjunto
             )
+    except Exception:
+        # No interrumpir la UX si falla el SMTP
+        pass
 
-    except Exception as e:
-        print(f"[WARN] Error enviando emails: {e}")
-
-    # 7) Agradecimiento
+    # 7) Página de agradecimiento con descarga
     return render_template("agradecimiento.html", telefono=CONTACTO_TELEFONO)
 
 @app.route("/descargar", methods=["GET"])
@@ -388,5 +341,6 @@ if __name__ == "__main__":
     os.makedirs(STATIC_DIR, exist_ok=True)
     # En dev: debug=True; en prod: usar WSGI/Gunicorn
     app.run(debug=True)
+
 
 
