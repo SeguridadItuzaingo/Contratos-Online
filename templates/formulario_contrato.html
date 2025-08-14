@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <title>Contrato Digital</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0d6efd;
+            --primary-700: #0b5ed7;
+            --danger: #dc3545;
+            --ok: #17a673;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            background: #f4f6f9;
+            color: #222;
+            font-family: Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif;
+        }
+
+        .wrap {
+            max-width: 980px;
+            margin: 40px auto;
+            padding: 0 16px
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 28px 32px;
+            box-shadow: 0 12px 30px rgba(0,0,0,.08)
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 10px
+        }
+
+            .brand img {
+                max-height: 72px
+            }
+
+        .subtitle {
+            text-align: center;
+            color: #555;
+            margin: 6px 0 22px;
+            font-weight: 600
+        }
+
+        /* Barra de progreso */
+        .progressbar {
+            position: sticky;
+            top: 0;
+            height: 4px;
+            background: linear-gradient(90deg,var(--primary) 0%,var(--primary) 0%,#e9ecef 0%);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 14px
+        }
+
+        /* VISOR CONTRATO */
+        #visorContrato {
+            max-height: 520px;
+            overflow: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 24px;
+            background: #fff
+        }
+
+        .contrato-texto {
+            font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+            font-size: 16.5px;
+            line-height: 1.68;
+            color: #1f2937;
+            text-align: justify
+        }
+
+            .contrato-texto p {
+                margin: 0 0 14px
+            }
+
+            .contrato-texto .clausula-titulo {
+                font-family: Inter,sans-serif;
+                font-weight: 700;
+                letter-spacing: .2px;
+                color: #0f172a;
+                margin-top: 18px;
+                margin-bottom: 6px
+            }
+
+            .contrato-texto .subtitulo-num {
+                font-family: Inter,sans-serif;
+                font-weight: 700;
+                color: #0f172a;
+                margin-top: 14px;
+                margin-bottom: 6px
+            }
+        /* Línea punteada para placeholders */
+        .placeholder-line {
+            display: inline-block;
+            vertical-align: baseline;
+            height: 1.1em;
+            border-bottom: 2px dotted #9aa3af;
+            min-width: 12ch;
+        }
+
+        .placeholder-short {
+            min-width: 8ch;
+        }
+
+        .placeholder-med {
+            min-width: 16ch;
+        }
+
+        .placeholder-long {
+            min-width: 24ch;
+        }
+
+        .divider {
+            height: 1px;
+            background: #eef1f5;
+            margin: 18px 0
+        }
+
+        .badge-ok {
+            display: none;
+            color: var(--ok);
+            font-weight: 700;
+            margin-top: 10px
+        }
+
+        /* FORM */
+        .form {
+            margin-top: 22px;
+            display: grid;
+            gap: 16px;
+            grid-template-columns: 1fr 1fr
+        }
+
+            .form .full {
+                grid-column: 1 / -1
+            }
+
+        label {
+            font-weight: 600;
+            color: #374151
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            font-size: 14px
+        }
+
+            input:focus {
+                outline: none;
+                border-color: var(--primary);
+                box-shadow: 0 0 0 2px rgba(13,110,253,.12)
+            }
+
+        /* FIRMA */
+        .firma-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px
+        }
+
+        .firma-label {
+            display: block;
+            text-align: center;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151
+        }
+
+        #firmaCanvas {
+            display: block;
+            background: #fff;
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 520px;
+            height: 200px;
+            touch-action: none
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center
+        }
+
+        .btn {
+            appearance: none;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-weight: 700;
+            cursor: pointer;
+            color: #fff;
+            background: #64748b
+        }
+
+            .btn.danger {
+                background: var(--danger)
+            }
+
+        .error-border {
+            border-color: var(--danger) !important;
+            box-shadow: 0 0 0 2px rgba(220,53,69,.12)
+        }
+
+        /* Submit pro */
+        .actions {
+            margin-top: 10px;
+            display: flex;
+            justify-content: center
+        }
+
+        .submit {
+            width: 100%;
+            max-width: 320px;
+            padding: 14px 18px;
+            border-radius: 12px;
+            background: linear-gradient(180deg,var(--primary),var(--primary-700));
+            border: 1px solid var(--primary-700);
+            color: #fff;
+            font-weight: 800;
+            box-shadow: 0 6px 14px rgba(13,110,253,.25);
+            transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+        }
+
+            .submit:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 10px 18px rgba(13,110,253,.28);
+                filter: saturate(1.05)
+            }
+
+            .submit:active {
+                transform: translateY(0);
+                box-shadow: 0 4px 10px rgba(13,110,253,.22)
+            }
+
+            .submit:disabled {
+                background: #94a3b8;
+                border-color: #94a3b8;
+                box-shadow: none
+            }
+
+        @media (max-width:760px) {
+            .form {
+                grid-template-columns: 1fr
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="card">
+            <div class="brand">
+                <img src="{{ url_for('static', filename='logo_empresa_firma.png') }}" alt="Logo">
+            </div>
+            <h2 class="subtitle">Lea el contrato hasta el final para habilitar la firma</h2>
+
+            <div class="progressbar" id="progressbar"></div>
+
+            <div id="visorContrato">
+                <div class="contrato-texto" id="contratoTexto">
+                    {{ contrato_html|safe }}
+                </div>
+            </div>
+
+            <div id="mensajeContratoLeido" class="badge-ok">✔ Contrato leído</div>
+
+            <div class="divider"></div>
+
+            <form id="formulario" class="form" method="POST" action="/generar">
+                <div class="full">
+                    <label for="nombre">Nombre completo</label>
+                    <input type="text" name="nombre" id="nombre" required>
+                </div>
+
+                <div>
+                    <label for="dni">DNI</label>
+                    <input type="text" name="dni" id="dni" required>
+                </div>
+                <div>
+                    <label for="email">Correo electrónico</label>
+                    <input type="email" name="email" id="email" required>
+                </div>
+
+                <div class="full">
+                    <label for="direccion">Dirección</label>
+                    <input type="text" name="direccion" id="direccion" required>
+                </div>
+
+                <div class="full">
+                    <label for="ubicacion">Ubicación de Monitoreo</label>
+                    <input type="text" name="ubicacion" id="ubicacion" required>
+                </div>
+
+                <div class="full">
+                    <!-- centrado arriba del canvas -->
+                    <label for="firmaCanvas" class="firma-label">Firma del Cliente (mouse o dedo)</label>
+                    <div class="firma-block">
+                        <canvas id="firmaCanvas"></canvas>
+                        <div class="toolbar">
+                            <button type="button" class="btn" id="btnUndo">Deshacer trazo</button>
+                            <button type="button" class="btn danger" id="btnClear">Borrar firma</button>
+                        </div>
+                    </div>
+                    <input type="hidden" name="firma" id="firmaBase64">
+                </div>
+
+                <div class="full actions">
+                    <button id="botonFirmar" class="submit" type="submit" disabled>Generar contrato</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            /* ======== Enmascarar placeholders con líneas punteadas ======== */
+            const cont = document.getElementById('contratoTexto');
+            const rules = [
+                // estilo minúsculas con espacios
+                { re: /\{\{\s*nombre\s*\}\}/gi, cls: "placeholder-med" },
+                { re: /\{\{\s*dni\s*\}\}/gi, cls: "placeholder-short" },
+                { re: /\{\{\s*direccion\s*\}\}/gi, cls: "placeholder-long" },
+                { re: /\{\{\s*email\s*\}\}/gi, cls: "placeholder-long" },
+                { re: /\{\{\s*ubicacion\s*\}\}/gi, cls: "placeholder-long" },
+                { re: /\{\{\s*ubicacion_monitoreo\s*\}\}/gi, cls: "placeholder-long" },
+                { re: /\{\{\s*responsable_empresa\s*\}\}/gi, cls: "placeholder-long" },
+                { re: /\{\{\s*fecha_firma\s*\}\}/gi, cls: "placeholder-short" },
+                // estilo mayúsculas corporativo sin espacios
+                { re: /\{\{\s*NOMBRE_ABONADO\s*\}\}/g, cls: "placeholder-med" },
+                { re: /\{\{\s*DNI_ABONADO\s*\}\}/g, cls: "placeholder-short" },
+                { re: /\{\{\s*DIRECCION_ABONADO\s*\}\}/g, cls: "placeholder-long" },
+                { re: /\{\{\s*EMAIL_ABONADO\s*\}\}/g, cls: "placeholder-long" },
+                { re: /\{\{\s*UBICACION_MONITOREO\s*\}\}/g, cls: "placeholder-long" },
+                { re: /\{\{\s*RESPONSABLE_EMPRESA\s*\}\}/g, cls: "placeholder-long" },
+                { re: /\{\{\s*FECHA_FIRMA\s*\}\}/g, cls: "placeholder-short" },
+            ];
+            let html = cont.innerHTML;
+            rules.forEach(r => {
+                html = html.replace(r.re, `<span class="placeholder-line ${r.cls}"></span>`);
+            });
+            cont.innerHTML = html;
+
+            /* ======== Subtítulos y cláusulas ======== */
+            const paras = Array.from(cont.querySelectorAll('p'));
+            const reClausula = /^\s*cl[aá]usula\s*\d+(\s*[.:–-]\s*)?/i;
+            const reNumSub = /^\s*\d+\s*[\.\)\-–]\s+[^\s].*/;
+            paras.forEach(p => {
+                const txt = (p.textContent || '').trim();
+                if (reClausula.test(txt)) p.classList.add('clausula-titulo');
+                else if (reNumSub.test(txt)) p.classList.add('subtitulo-num');
+                else p.classList.remove('clausula-titulo', 'subtitulo-num');
+            });
+
+            /* ======== Progreso de lectura y habilitación ======== */
+            const visor = document.getElementById('visorContrato');
+            const msgLeido = document.getElementById('mensajeContratoLeido');
+            const bar = document.getElementById('progressbar');
+            const btnSubmit = document.getElementById('botonFirmar');
+
+            function updateProgress() {
+                const ratio = Math.min(1, (visor.scrollTop + visor.clientHeight) / visor.scrollHeight);
+                bar.style.background = `linear-gradient(90deg,var(--primary) 0%,var(--primary) ${ratio * 100}%,#e9ecef ${ratio * 100}%)`;
+                if (ratio >= 0.995) { msgLeido.style.display = "block"; btnSubmit.disabled = false; }
+            }
+            visor.addEventListener('scroll', updateProgress);
+            updateProgress();
+
+            /* ======== Firma (suavizado + undo + retina) ======== */
+            const canvas = document.getElementById("firmaCanvas");
+            const ctx = canvas.getContext("2d");
+            const hiddenInput = document.getElementById("firmaBase64");
+            const btnUndo = document.getElementById("btnUndo");
+            const btnClear = document.getElementById("btnClear");
+
+            let dpr = Math.max(window.devicePixelRatio || 1, 1);
+            let drawing = false;
+            let hasInk = false;
+
+            const paths = [];
+            let currentPath = [];
+
+            function resizeCanvas() {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = Math.floor(rect.width * dpr);
+                canvas.height = Math.floor(rect.height * dpr);
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.scale(dpr, dpr);
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+                ctx.strokeStyle = "#000";
+                ctx.fillStyle = "#000";
+                ctx.lineWidth = 2.2;
+                redrawAll();
+                canvas.classList.remove('error-border');
+            }
+            function redrawAll() {
+                const rect = canvas.getBoundingClientRect();
+                ctx.clearRect(0, 0, rect.width, rect.height);
+                for (const path of paths) { drawSmoothed(path, false); }
+                if (currentPath.length) drawSmoothed(currentPath, false);
+            }
+            window.addEventListener('resize', () => { resizeCanvas(); });
+            resizeCanvas();
+
+            function getPos(e) {
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX ?? (e.touches && e.touches[0].clientX)) - rect.left;
+                const y = (e.clientY ?? (e.touches && e.touches[0].clientY)) - rect.top;
+                return { x, y, t: performance.now() };
+            }
+
+            function drawSmoothed(points, live = true) {
+                if (!points.length) return;
+                if (points.length === 1) {
+                    const p = points[0];
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 0.7, 0, Math.PI * 2); ctx.fill(); return;
+                }
+                for (let i = 0; i < points.length - 1; i++) {
+                    const p0 = points[i > 0 ? i - 1 : i];
+                    const p1 = points[i];
+                    const p2 = points[i + 1];
+
+                    const dt = Math.max(1, p2.t - p1.t);
+                    const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                    const v = dist / dt;
+
+                    const lw = Math.max(1.8, 3.0 - Math.min(1.6, v * 12));
+                    ctx.lineWidth = lw;
+
+                    const mx1 = (p0.x + p1.x) / 2, my1 = (p0.y + p1.y) / 2;
+                    const mx2 = (p1.x + p2.x) / 2, my2 = (p1.y + p2.y) / 2;
+
+                    ctx.beginPath();
+                    ctx.moveTo(mx1, my1);
+                    ctx.quadraticCurveTo(p1.x, p1.y, mx2, my2);
+                    ctx.stroke();
+                }
+                if (live) hasInk = true;
+            }
+
+            function startDraw(e) { e.preventDefault(); drawing = true; currentPath = []; const p = getPos(e); currentPath.push(p); drawSmoothed(currentPath); canvas.classList.remove('error-border'); }
+            function moveDraw(e) { if (!drawing) return; e.preventDefault(); const p = getPos(e); currentPath.push(p); drawSmoothed(currentPath); }
+            function endDraw(e) { if (!drawing) return; e.preventDefault(); drawing = false; if (currentPath.length) { paths.push(currentPath.slice()); hasInk = true; currentPath = []; } }
+
+            if (window.PointerEvent) {
+                canvas.addEventListener('pointerdown', startDraw);
+                canvas.addEventListener('pointermove', moveDraw);
+                canvas.addEventListener('pointerup', endDraw);
+                canvas.addEventListener('pointerleave', endDraw);
+                canvas.addEventListener('pointercancel', endDraw);
+            } else {
+                canvas.addEventListener('mousedown', startDraw);
+                canvas.addEventListener('mousemove', moveDraw);
+                window.addEventListener('mouseup', endDraw);
+                canvas.addEventListener('touchstart', startDraw, { passive: false });
+                canvas.addEventListener('touchmove', moveDraw, { passive: false });
+                canvas.addEventListener('touchend', endDraw);
+                canvas.addEventListener('touchcancel', endDraw);
+            }
+
+            function exportSignature() { return canvas.toDataURL("image/png"); }
+            function clearSignature() { paths.length = 0; currentPath = []; hasInk = false; redrawAll(); hiddenInput.value = ""; canvas.classList.remove('error-border'); }
+            function undoSignature() { if (!paths.length) return; paths.pop(); hasInk = paths.length > 0; redrawAll(); }
+
+            document.getElementById("btnClear").addEventListener('click', clearSignature);
+            document.getElementById("btnUndo").addEventListener('click', undoSignature);
+
+            /* Validación envío */
+            document.getElementById("formulario").addEventListener("submit", (e) => {
+                if (!btnSubmit.disabled) hiddenInput.value = hasInk ? exportSignature() : "";
+                if (!hasInk) {
+                    e.preventDefault();
+                    canvas.classList.add("error-border");
+                    alert("Por favor, dibuje su firma antes de enviar el contrato.");
+                    canvas.scrollIntoView({ behavior: "smooth", block: "center" });
+                    return false;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

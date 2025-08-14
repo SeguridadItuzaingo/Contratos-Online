@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.pytest_cache/
+.vscode/
+
+# Artefactos generados: no subirlos
+static/*.pdf
+static/*.docx
+static/firma_*.png
