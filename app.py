@@ -6,7 +6,7 @@ import unicodedata
 from datetime import datetime
 from io import BytesIO
 import base64
-from sys import platform
+import html
 
 from docx import Document
 from docx.shared import Inches, Pt
@@ -16,21 +16,21 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from PIL import Image
 
-import html
-
-from docx2pdf import convert
 from dotenv import load_dotenv
 
-# En Windows con docx2pdf + Word
+# Email helper (debe existir correo_util.py con enviar_email(to, asunto, cuerpo, adjunto_path))
+import correo_util
+
+# (Opcional/Windows) Para docx2pdf con Word
 try:
     import pythoncom
     HAS_PYTHONCOM = True
 except Exception:
     HAS_PYTHONCOM = False
 
-# Email
-import correo_util
-
+# =========================================================
+# App / Config
+# =========================================================
 load_dotenv()
 
 app = Flask(__name__)
@@ -40,18 +40,22 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATE_DOCX = os.path.join(BASE_DIR, "Contrato_Plantilla.docx")
 
-# Config empresa
+# Asegurar carpeta de salida también en Gunicorn (Render)
+os.makedirs(STATIC_DIR, exist_ok=True)
+
+# Datos empresa (ajustables)
 RESPONSABLE_EMPRESA = "Alan Arndt, Dueño de la Empresa"
-FIRMA_EMPRESA_PATH = os.path.join(STATIC_DIR, "firma_empresa.png")  # o logo_empresa_firma.png
-EMAIL_EMPRESA = os.getenv("EMAIL_EMPRESA")  # definir en .env
+FIRMA_EMPRESA_PATH = os.path.join(STATIC_DIR, "firma_empresa.png")
+EMAIL_EMPRESA = os.getenv("EMAIL_EMPRESA", "")
 CONTACTO_TELEFONO = os.getenv("CONTACTO_TELEFONO", "")
 
-# Tamaños de firma (puede ajustar a gusto)
-SIGNATURE_IMAGE_WIDTH_IN = 2.8   # ancho de la firma (antes 2.0)
-SIGNATURE_LABEL_FONT_PT  = 12    # tamaño de rótulos "Firma del ..."
+# Tamaños de firma
+SIGNATURE_IMAGE_WIDTH_IN = 2.8
+SIGNATURE_LABEL_FONT_PT = 12
 
-# -------------------- Helpers --------------------
-
+# =========================================================
+# Helpers
+# =========================================================
 def _now_tag() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -61,10 +65,7 @@ def _slug(s: str) -> str:
     return s or f"cliente_{uuid4().hex[:6]}"
 
 def _docx_to_html_paragraphs(path_docx: str) -> str:
-    """
-    Lee el .docx y lo convierte a párrafos HTML simples (<p>...</p>).
-    (Solo párrafos; si necesitás tablas, lo ampliamos luego.)
-    """
+    """Convierte el DOCX a párrafos HTML simples para previsualizarlo."""
     doc = Document(path_docx)
     parts = []
     for p in doc.paragraphs:
@@ -73,9 +74,7 @@ def _docx_to_html_paragraphs(path_docx: str) -> str:
     return "\n".join(parts)
 
 def _b64_to_pil_image(b64data: str) -> Image.Image:
-    """
-    Espera 'data:image/png;base64,AAAA...' o solo el base64.
-    """
+    """Convierte base64 (data:image/png;base64,...) a PIL Image RGBA."""
     if "," in b64data:
         b64data = b64data.split(",", 1)[1]
     raw = base64.b64decode(b64data)
@@ -83,8 +82,8 @@ def _b64_to_pil_image(b64data: str) -> Image.Image:
 
 def _insert_text_placeholders(doc: Document, mapping: dict):
     """
-    Reemplazo robusto: opera a nivel de párrafo/celda para evitar el problema
-    de placeholders “partidos” en runs.
+    Reemplazo robusto a nivel de párrafo/celda para evitar placeholders cortados.
+    Usa p.text = nuevo_texto (python-docx re-crea runs).
     """
     def replace_text(text: str) -> str:
         for k, v in mapping.items():
@@ -95,7 +94,7 @@ def _insert_text_placeholders(doc: Document, mapping: dict):
     for p in doc.paragraphs:
         new = replace_text(p.text)
         if new != p.text:
-            p.text = new  # reasigna el texto del párrafo (python-docx crea un run único)
+            p.text = new
 
     # Celdas de tablas
     for table in doc.tables:
@@ -107,7 +106,7 @@ def _insert_text_placeholders(doc: Document, mapping: dict):
                         p.text = new
 
 def _ensure_company_signature(path_png: str, texto: str = "Alan Arndt"):
-    """Genera una firma básica de empresa si no existe el archivo."""
+    """Genera una firma PNG básica para la empresa si no existe."""
     if os.path.exists(path_png):
         return
     from PIL import Image, ImageDraw, ImageFont
@@ -125,9 +124,9 @@ def _ensure_company_signature(path_png: str, texto: str = "Alan Arndt"):
 def _add_signatures_section(doc: Document, firma_cliente_path: str, firma_empresa_path: str):
     """
     Inserta ambas firmas en una tabla 2x2:
-      Fila 0: imágenes    (cliente izq | empresa der)
-      Fila 1: rótulos     ("Firma del Cliente" | "Firma de la Empresa")
-    Reutiliza tabla existente si detecta esos rótulos.
+      Fila 0: imágenes (cliente | empresa)
+      Fila 1: rótulos  ("Firma del Cliente" | "Firma de la Empresa")
+    Si detecta ya una tabla con esos rótulos, la reutiliza.
     """
     target = None
     for tbl in doc.tables:
@@ -148,13 +147,11 @@ def _add_signatures_section(doc: Document, firma_cliente_path: str, firma_empres
     while len(target.rows) < 2:
         target.add_row()
 
-    # --- Ancho fijo y parejo de columnas (evita que Word las deforme) ---
+    # Layout fijo
     try:
         target.autofit = False
     except Exception:
         pass
-
-    # Forzar layout "fixed" a nivel de tabla (algunos Word lo respetan mejor)
     try:
         tbl = target._tbl
         tblPr = tbl.tblPr
@@ -164,8 +161,8 @@ def _add_signatures_section(doc: Document, firma_cliente_path: str, firma_empres
     except Exception:
         pass
 
-    # Ancho preferido de columnas y de celdas (parejo)
-    col_w = Inches(3.2)  # ajustá a gusto
+    # Ancho parejo
+    col_w = Inches(3.2)
     for i in range(2):
         try:
             target.columns[i].width = col_w
@@ -177,18 +174,17 @@ def _add_signatures_section(doc: Document, firma_cliente_path: str, firma_empres
             except Exception:
                 pass
 
-    # Fila 0: imágenes centradas (más grandes)
+    # Fila 0: imágenes centradas
     for col, img_path in enumerate([firma_cliente_path, firma_empresa_path]):
         c = target.cell(0, col)
-        c.text = ""  # limpiar celda
+        c.text = ""
         c.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
         p = c.paragraphs[0]
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         if os.path.exists(img_path) and os.path.getsize(img_path) > 0:
-            ancho = SIGNATURE_IMAGE_WIDTH_IN if 'SIGNATURE_IMAGE_WIDTH_IN' in globals() else 2.8
-            p.add_run().add_picture(img_path, width=Inches(ancho))
+            p.add_run().add_picture(img_path, width=Inches(SIGNATURE_IMAGE_WIDTH_IN))
 
-    # Fila 1: rótulos centrados (negrita + tamaño)
+    # Fila 1: rótulos centrados
     for col, texto in enumerate(["Firma del Cliente", "Firma de la Empresa"]):
         c = target.cell(1, col)
         c.text = ""
@@ -198,37 +194,36 @@ def _add_signatures_section(doc: Document, firma_cliente_path: str, firma_empres
         run = p.add_run(texto)
         run.bold = True
         try:
-            run.font.size = Pt(SIGNATURE_LABEL_FONT_PT if 'SIGNATURE_LABEL_FONT_PT' in globals() else 12)
+            run.font.size = Pt(SIGNATURE_LABEL_FONT_PT)
         except Exception:
             pass
 
 def _export_to_pdf_safe(out_docx: str, out_pdf: str) -> bool:
     """
-    Convierte DOCX -> PDF usando LibreOffice en Linux.
-    - Intenta 'soffice' y 'libreoffice'
-    - Fuerza perfil/headless y locale
+    Convierte DOCX -> PDF en Linux usando LibreOffice.
+    - Fuerza headless/locale y prueba 'soffice' y 'libreoffice'.
     """
-    import subprocess, shlex, os
+    import subprocess, shlex
 
     out_dir = os.path.dirname(out_pdf) or "."
-    # LibreOffice a veces necesita HOME/LANG para inicializar bien en contenedores
     env = os.environ.copy()
     env.setdefault("HOME", "/tmp")
     env.setdefault("LANG", "en_US.UTF-8")
 
-    # Dos binarios posibles, y forzamos el filtro de Writer
     cmds = [
         f"soffice --headless --norestore --nolockcheck --nodefault "
         f"--convert-to pdf:writer_pdf_Export --outdir {shlex.quote(out_dir)} {shlex.quote(out_docx)}",
         f"libreoffice --headless --norestore --nolockcheck --nodefault "
-        f"--convert-to pdf:writer_pdf_Export --outdir {shlex.quote(out_dir)} {shlex.quote(out_docx)}"
+        f"--convert-to pdf:writer_pdf_Export --outdir {shlex.quote(out_dir)} {shlex.quote(out_docx)}",
     ]
 
     for cmd in cmds:
         try:
-            subprocess.run(cmd, shell=True, check=True,
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                           timeout=180, env=env)
+            subprocess.run(
+                cmd, shell=True, check=True,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                timeout=180, env=env
+            )
             gen_pdf = os.path.join(out_dir, os.path.splitext(os.path.basename(out_docx))[0] + ".pdf")
             if os.path.exists(gen_pdf) and os.path.getsize(gen_pdf) > 0:
                 if gen_pdf != out_pdf:
@@ -238,9 +233,10 @@ def _export_to_pdf_safe(out_docx: str, out_pdf: str) -> bool:
             continue
 
     return False
-    
-# -------------------- Rutas --------------------
 
+# =========================================================
+# Rutas
+# =========================================================
 @app.route("/", methods=["GET"])
 def index():
     if not os.path.exists(TEMPLATE_DOCX):
@@ -279,7 +275,27 @@ def generar():
     except Exception:
         return "La imagen de la firma es inválida.", 400
 
-        # 4) Guardar DOCX
+    # 3.b) Abrir plantilla y hacer reemplazos
+    try:
+        doc = Document(TEMPLATE_DOCX)
+    except Exception as e:
+        return f"No se pudo abrir la plantilla del contrato: {e}", 500
+
+    mapping = {
+        "{{ nombre }}": nombre,
+        "{{ dni }}": dni,
+        "{{ direccion }}": direccion,
+        "{{ email }}": email,
+        "{{ ubicacion }}": ubicacion,
+        "{{ fecha_hoy }}": datetime.now().strftime("%d/%m/%Y"),
+    }
+    _insert_text_placeholders(doc, mapping)
+
+    # 3.c) Firmas (cliente + empresa)
+    _ensure_company_signature(FIRMA_EMPRESA_PATH)
+    _add_signatures_section(doc, firma_cliente_path, FIRMA_EMPRESA_PATH)
+
+    # 4) Guardar DOCX
     try:
         doc.save(out_docx)
     except Exception as e:
@@ -290,8 +306,7 @@ def generar():
     if pdf_ok and os.path.exists(out_pdf) and os.path.getsize(out_pdf) > 0:
         session["archivo_pdf"] = out_pdf
     else:
-        # No rompemos el flujo: dejamos DOCX listo para descarga/envío
-        session["archivo_pdf"] = out_docx
+        session["archivo_pdf"] = out_docx  # fallback sin romper el flujo
 
     # 6) Enviar correos (cliente y empresa) sin romper flujo si falla SMTP
     try:
@@ -309,11 +324,11 @@ def generar():
             f"Email: {EMAIL_EMPRESA or '-'}\n"
         )
 
-        # Enviar al cliente (si cargó email)
+        # Enviar al cliente
         if email:
             correo_util.enviar_email(email, asunto, cuerpo, adjunto)
 
-        # Copia a la empresa (si está configurado)
+        # Copia a la empresa
         if EMAIL_EMPRESA:
             correo_util.enviar_email(
                 EMAIL_EMPRESA,
@@ -335,12 +350,8 @@ def descargar():
         return "Error: No se encontró el contrato para descargar.", 404
     return send_file(archivo, as_attachment=True, download_name=os.path.basename(archivo))
 
-# -------------------- Main --------------------
-
+# =========================================================
+# Main (solo desarrollo; en Render se usa gunicorn)
+# =========================================================
 if __name__ == "__main__":
-    os.makedirs(STATIC_DIR, exist_ok=True)
-    # En dev: debug=True; en prod: usar WSGI/Gunicorn
     app.run(debug=True)
-
-
-
