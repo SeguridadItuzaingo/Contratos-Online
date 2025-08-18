@@ -1,3 +1,4 @@
+from drive_util import upload_path_to_drive
 from flask import Flask, render_template, request, send_file, session
 from uuid import uuid4
 import os
@@ -302,11 +303,31 @@ def generar():
         return f"No se pudo guardar el DOCX: {e}", 500
 
     # 5) Convertir a PDF con fallback
-    pdf_ok = _export_to_pdf_safe(out_docx, out_pdf)
-    if pdf_ok and os.path.exists(out_pdf) and os.path.getsize(out_pdf) > 0:
-        session["archivo_pdf"] = out_pdf
-    else:
-        session["archivo_pdf"] = out_docx  # fallback sin romper el flujo
+pdf_ok = _export_to_pdf_safe(out_docx, out_pdf)
+if pdf_ok and os.path.exists(out_pdf) and os.path.getsize(out_pdf) > 0:
+    session["archivo_pdf"] = out_pdf
+else:
+    session["archivo_pdf"] = out_docx  # fallback sin romper el flujo
+
+# 5.1) Subir a Google Drive (no bloquea al usuario si falla)
+try:
+    adjunto_path = session["archivo_pdf"]
+    ext = os.path.splitext(adjunto_path)[1].lower()
+    mimetype = (
+        "application/pdf"
+        if ext == ".pdf"
+        else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+
+    # Nombre prolijo para el archivo remoto
+    safe_nombre = "".join(c for c in nombre if c.isalnum() or c in " _-").strip().replace(" ", "_")
+    fecha_str = datetime.now().strftime("%Y-%m-%d")
+    nombre_remoto = f"{fecha_str}_{safe_nombre}_{dni}_Contrato{ext}"
+
+    drive_id = upload_path_to_drive(adjunto_path, nombre_remoto, mimetype)
+    app.logger.info(f"[Drive] Subido OK. fileId={drive_id}")
+except Exception as e:
+    app.logger.exception(f"[Drive] Falló la subida: {e}")
 
     # 6) Enviar correos (cliente y empresa) sin romper flujo si falla SMTP
     try:
@@ -355,3 +376,4 @@ def descargar():
 # =========================================================
 if __name__ == "__main__":
     app.run(debug=True)
+
