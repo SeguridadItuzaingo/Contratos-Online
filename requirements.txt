@@ -4,3 +4,7 @@ Pillow==10.4.0
 python-dotenv==1.0.1
 docx2pdf==0.1.8
 gunicorn==22.0.0
+google-api-python-client
+google-auth
+google-auth-httplib2
+google-auth-oauthlib
