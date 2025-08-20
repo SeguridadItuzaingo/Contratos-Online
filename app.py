@@ -288,6 +288,7 @@ def generar():
         "{{ direccion }}": direccion,
         "{{ email }}": email,
         "{{ ubicacion }}": ubicacion,
+        "{{ ubicacion_monitoreo }}": ubicacion_monitoreo,
         "{{ fecha_hoy }}": datetime.now().strftime("%d/%m/%Y"),
     }
     _insert_text_placeholders(doc, mapping)
@@ -376,5 +377,6 @@ def descargar():
 # =========================================================
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
