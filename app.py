@@ -254,6 +254,7 @@ def generar():
     direccion = request.form.get("direccion", "").strip()
     email = (request.form.get("email") or request.form.get("correo") or request.form.get("mail") or "").strip()
     ubicacion = (request.form.get("ubicacion_monitoreo") or request.form.get("ubicacion") or "").strip()
+    ubicacion_monitoreo = request.form.get("ubicacion_monitoreo", "").strip()
     firma_b64 = (request.form.get("firmaBase64") or request.form.get("firma") or "").strip()
 
     faltantes = [k for k, v in {
@@ -377,6 +378,7 @@ def descargar():
 # =========================================================
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
