@@ -83,13 +83,33 @@ def _b64_to_pil_image(b64data: str) -> Image.Image:
 
 def _insert_text_placeholders(doc: Document, mapping: dict):
     """
-    Reemplazo robusto a nivel de párrafo/celda para evitar placeholders cortados.
-    Usa p.text = nuevo_texto (python-docx re-crea runs).
+    Reemplazo robusto a nivel de párrafo/celda.
+    - Normaliza NBSP/zero-width en el texto del DOCX.
+    - Hace reemplazos literales (mapping).
+    - Aplica un regex tolerante para {{ ubicacion_monitoreo }} por si quedó cortado/espaciado.
     """
+    import re
+
+    def _norm(s: str) -> str:
+        # NBSP -> espacio, elimina zero-width
+        return (s or "").replace("\xa0", " ").replace("\u200b", "")
+
+    # regex tolerante: {{ u b i c a c i o n _? m o n i t o r e o }}
+    ubi_mon_re = re.compile(
+        r"\{\{\s*u\s*b\s*i\s*c\s*a\s*c\s*i\s*o\s*n\s*(?:_| |\t)?\s*m\s*o\s*n\s*i\s*t\s*o\s*r\s*e\s*o\s*\}\}",
+        re.IGNORECASE
+    )
+
     def replace_text(text: str) -> str:
+        t = _norm(text)
+        # Pase literal con lo que ya tenés en 'mapping'
         for k, v in mapping.items():
-            text = text.replace(k, v)
-        return text
+            t = t.replace(k, v)
+        # Pase extra solo para ubicacion_monitoreo tolerando cortes/espacios
+        valor_ubi_mon = mapping.get("{{ ubicacion_monitoreo }}", "")
+        if valor_ubi_mon:
+            t = ubi_mon_re.sub(valor_ubi_mon, t)
+        return t
 
     # Párrafos fuera de tablas
     for p in doc.paragraphs:
@@ -378,6 +398,7 @@ def descargar():
 # =========================================================
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
