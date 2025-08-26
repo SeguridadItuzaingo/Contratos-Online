@@ -272,15 +272,15 @@ def generar():
     nombre = request.form.get("nombre", "").strip()
     dni = request.form.get("dni", "").strip()
     email = (request.form.get("email") or request.form.get("correo") or request.form.get("mail") or "").strip()
-    ubicacion = request.form.get("ubicacion", "").strip()  # Domicilio del cliente
-    ubicacion_monitoreo = request.form.get("ubicacion_monitoreo", "").strip()  # Lugar monitoreado
+    ubicacion = request.form.get("ubicacion", "").strip()  # domicilio del abonado
+    ubicacion_monitoreo = request.form.get("ubicacion_monitoreo", "").strip()  # lugar monitoreado
     firma_b64 = (request.form.get("firmaBase64") or request.form.get("firma") or "").strip()
 
     faltantes = [k for k, v in {
-    "nombre": nombre, "dni": dni, "direccion": direccion,
+    "nombre": nombre, "dni": dni,
     "email": email,
-    "ubicacion": ubicacion,  # domicilio del cliente
-    "ubicacion_monitoreo": ubicacion_monitoreo,  # lugar monitoreado
+    "ubicacion": ubicacion,                     # domicilio del abonado
+    "ubicacion_monitoreo": ubicacion_monitoreo, # lugar monitoreado
     "firma": firma_b64
 }.items() if not v]
     
@@ -307,8 +307,8 @@ def generar():
     "{{ nombre }}": nombre,
     "{{ dni }}": dni,
     "{{ email }}": email,
-    "{{ ubicacion }}": ubicacion,  # domicilio del cliente
-    "{{ ubicacion_monitoreo }}": ubicacion_monitoreo,  # lugar monitoreado
+    "{{ ubicacion }}": ubicacion,
+    "{{ ubicacion_monitoreo }}": ubicacion_monitoreo,
     "{{ fecha_hoy }}": datetime.now().strftime("%d/%m/%Y"),
 }
     _insert_text_placeholders(doc, mapping)
@@ -397,6 +397,7 @@ def descargar():
 # =========================================================
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
