@@ -340,21 +340,21 @@
                 // estilo minúsculas con espacios
                 { re: /\{\{\s*nombre\s*\}\}/gi, cls: "placeholder-med" },
                 { re: /\{\{\s*dni\s*\}\}/gi, cls: "placeholder-short" },
-                { re: /\{\{\s*direccion\s*\}\}/gi, cls: "placeholder-long" },
                 { re: /\{\{\s*email\s*\}\}/gi, cls: "placeholder-long" },
                 { re: /\{\{\s*ubicacion\s*\}\}/gi, cls: "placeholder-long" },
                 { re: /\{\{\s*ubicacion_monitoreo\s*\}\}/gi, cls: "placeholder-long" },
                 { re: /\{\{\s*responsable_empresa\s*\}\}/gi, cls: "placeholder-long" },
                 { re: /\{\{\s*fecha_firma\s*\}\}/gi, cls: "placeholder-short" },
+
                 // estilo mayúsculas corporativo sin espacios
                 { re: /\{\{\s*NOMBRE_ABONADO\s*\}\}/g, cls: "placeholder-med" },
                 { re: /\{\{\s*DNI_ABONADO\s*\}\}/g, cls: "placeholder-short" },
-                { re: /\{\{\s*DIRECCION_ABONADO\s*\}\}/g, cls: "placeholder-long" },
                 { re: /\{\{\s*EMAIL_ABONADO\s*\}\}/g, cls: "placeholder-long" },
                 { re: /\{\{\s*UBICACION_MONITOREO\s*\}\}/g, cls: "placeholder-long" },
                 { re: /\{\{\s*RESPONSABLE_EMPRESA\s*\}\}/g, cls: "placeholder-long" },
                 { re: /\{\{\s*FECHA_FIRMA\s*\}\}/g, cls: "placeholder-short" },
-            ];
+];
+
             let html = cont.innerHTML;
             rules.forEach(r => {
                 html = html.replace(r.re, `<span class="placeholder-line ${r.cls}"></span>`);
@@ -501,4 +501,5 @@
     </script>
 </body>
 </html>
+
 
