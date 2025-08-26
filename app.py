@@ -268,32 +268,31 @@ def index():
 
 @app.route("/generar", methods=["POST"])
 def generar():
-    # 1) Validación básica
+    # 1) Lectura de campos
     nombre = request.form.get("nombre", "").strip()
     dni = request.form.get("dni", "").strip()
     email = (request.form.get("email") or request.form.get("correo") or request.form.get("mail") or "").strip()
 
     # Domicilio del abonado
     ubicacion = request.form.get("ubicacion", "").strip()
-
     # Lugar monitoreado
     ubicacion_monitoreo = request.form.get("ubicacion_monitoreo", "").strip()
 
     firma_b64 = (request.form.get("firmaBase64") or request.form.get("firma") or "").strip()
 
-    # Revisión de faltantes
+    # 1.b) Validación
     faltantes = [k for k, v in {
         "nombre": nombre,
         "dni": dni,
         "email": email,
-        "ubicacion": ubicacion,                       # domicilio del abonado
-        "ubicacion_monitoreo": ubicacion_monitoreo,   # lugar monitoreado
+        "ubicacion": ubicacion,
+        "ubicacion_monitoreo": ubicacion_monitoreo,
         "firma": firma_b64
     }.items() if not v]
     if faltantes:
         return f"Faltan campos obligatorios: {', '.join(faltantes)}", 400
-    
-        # 2) Preparar rutas de salida
+
+    # 2) Preparar rutas de salida
     slug = f"{_slug(nombre)}_{_now_tag()}_{uuid4().hex[:6]}"
     out_docx = os.path.join(STATIC_DIR, f"{slug}.docx")
     out_pdf = os.path.join(STATIC_DIR, f"{slug}.pdf")
@@ -320,8 +319,12 @@ def generar():
         "{{ ubicacion_monitoreo }}": ubicacion_monitoreo,     # lugar monitoreado
         "{{ fecha_hoy }}": datetime.now().strftime("%d/%m/%Y"),
     }
-    _insert_text_placeholders(doc, mapping)
-    
+    try:
+        _insert_text_placeholders(doc, mapping)
+    except Exception as e:
+        app.logger.exception("Error reemplazando placeholders")
+        return f"Error interno al completar el contrato: {e}", 500
+
     # 3.c) Firmas (cliente + empresa)
     _ensure_company_signature(FIRMA_EMPRESA_PATH)
     _add_signatures_section(doc, firma_cliente_path, FIRMA_EMPRESA_PATH)
@@ -332,24 +335,19 @@ def generar():
     except Exception as e:
         return f"No se pudo guardar el DOCX: {e}", 500
 
-    # 5) Convertir a PDF con fallback
+    # 5) Convertir a PDF (si falla, dejamos el DOCX para descargar)
     pdf_ok = _export_to_pdf_safe(out_docx, out_pdf)
     if pdf_ok and os.path.exists(out_pdf) and os.path.getsize(out_pdf) > 0:
         session["archivo_pdf"] = out_pdf
     else:
-        session["archivo_pdf"] = out_docx  # fallback sin romper el flujo
+        session["archivo_pdf"] = out_docx
 
-    # 5.1) Subir a Google Drive (no bloquea al usuario si falla)
+    # 5.1) Subir a Drive (no bloqueante)
     try:
         adjunto_path = session["archivo_pdf"]
         ext = os.path.splitext(adjunto_path)[1].lower()
-        mimetype = (
-            "application/pdf"
-            if ext == ".pdf"
-            else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+        mimetype = "application/pdf" if ext == ".pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-        # Nombre prolijo para el archivo remoto
         safe_nombre = "".join(c for c in nombre if c.isalnum() or c in " _-").strip().replace(" ", "_")
         fecha_str = datetime.now().strftime("%Y-%m-%d")
         nombre_remoto = f"{fecha_str}_{safe_nombre}_{dni}_Contrato{ext}"
@@ -359,40 +357,36 @@ def generar():
     except Exception as e:
         app.logger.exception(f"[Drive] Falló la subida: {e}")
 
-    # 6) Enviar correos (cliente y empresa) sin romper flujo si falla SMTP
-try:
-    adjunto = session["archivo_pdf"]
-    asunto = "Contrato firmado - Seguridad Ituzaingó"
-    cuerpo = (
-        f"Estimado/a {nombre},\n\n"
-        f"Adjuntamos el contrato firmado correspondiente al servicio de monitoreo en {ubicacion_monitoreo}.\n"
-        f"Domicilio del abonado: {ubicacion}.\n"
-        "Le recomendamos conservar el archivo para su referencia.\n\n"
-        "Quedamos a disposición por cualquier consulta.\n\n"
-        "Atentamente,\n"
-        "Seguridad Ituzaingó\n"
-        "Alan Arndt — Dueño de la Empresa\n"
-        f"Tel.: {CONTACTO_TELEFONO or '-'}\n"
-        f"Email: {EMAIL_EMPRESA or '-'}\n"
-    )
-
-    # Enviar al cliente
-    if email and correo_util:
-        correo_util.enviar_email(email, asunto, cuerpo, adjunto)
-
-    # Copia a la empresa
-    if EMAIL_EMPRESA and correo_util:
-        correo_util.enviar_email(
-            EMAIL_EMPRESA,
-            "Nuevo contrato firmado - Seguridad Ituzaingó",
-            f"El/La cliente {nombre} firmó un contrato.\n\n{cuerpo}",
-            adjunto
+    # 6) Enviar correos (no interrumpe si falla)
+    try:
+        adjunto = session["archivo_pdf"]
+        asunto = "Contrato firmado - Seguridad Ituzaingó"
+        cuerpo = (
+            f"Estimado/a {nombre},\n\n"
+            f"Adjuntamos el contrato firmado correspondiente al servicio de monitoreo en {ubicacion_monitoreo}.\n"
+            f"Domicilio del abonado: {ubicacion}.\n"
+            "Le recomendamos conservar el archivo para su referencia.\n\n"
+            "Quedamos a disposición por cualquier consulta.\n\n"
+            "Atentamente,\n"
+            "Seguridad Ituzaingó\n"
+            "Alan Arndt — Dueño de la Empresa\n"
+            f"Tel.: {CONTACTO_TELEFONO or '-'}\n"
+            f"Email: {EMAIL_EMPRESA or '-'}\n"
         )
-except Exception:
-    # No interrumpir la UX si falla el SMTP
-    pass
 
-    # 7) Página de agradecimiento con descarga
+        if email:
+            correo_util.enviar_email(email, asunto, cuerpo, adjunto)
+        if EMAIL_EMPRESA:
+            correo_util.enviar_email(
+                EMAIL_EMPRESA,
+                "Nuevo contrato firmado - Seguridad Ituzaingó",
+                f"El/La cliente {nombre} firmó un contrato.\n\n{cuerpo}",
+                adjunto
+            )
+    except Exception:
+        pass
+
+    # 7) Página de agradecimiento
     return render_template("agradecimiento.html", telefono=CONTACTO_TELEFONO)
 
 @app.route("/descargar", methods=["GET"])
@@ -407,6 +401,7 @@ def descargar():
 # =========================================================
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
