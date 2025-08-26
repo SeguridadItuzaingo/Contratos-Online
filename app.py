@@ -360,37 +360,37 @@ def generar():
         app.logger.exception(f"[Drive] Falló la subida: {e}")
 
     # 6) Enviar correos (cliente y empresa) sin romper flujo si falla SMTP
-    try:
-        adjunto = session["archivo_pdf"]
-        asunto = "Contrato firmado - Seguridad Ituzaingó"
-cuerpo = (
-    f"Estimado/a {nombre},\n\n"
-    f"Adjuntamos el contrato firmado correspondiente al servicio de monitoreo en {ubicacion_monitoreo}.\n"
-    f"Domicilio del abonado: {ubicacion}.\n"
-    "Le recomendamos conservar el archivo para su referencia.\n\n"
-    "Quedamos a disposición por cualquier consulta.\n\n"
-    "Atentamente,\n"
-    "Seguridad Ituzaingó\n"
-    "Alan Arndt — Dueño de la Empresa\n"
-    f"Tel.: {CONTACTO_TELEFONO or '-'}\n"
-    f"Email: {EMAIL_EMPRESA or '-'}\n"
-)
+try:
+    adjunto = session["archivo_pdf"]
+    asunto = "Contrato firmado - Seguridad Ituzaingó"
+    cuerpo = (
+        f"Estimado/a {nombre},\n\n"
+        f"Adjuntamos el contrato firmado correspondiente al servicio de monitoreo en {ubicacion_monitoreo}.\n"
+        f"Domicilio del abonado: {ubicacion}.\n"
+        "Le recomendamos conservar el archivo para su referencia.\n\n"
+        "Quedamos a disposición por cualquier consulta.\n\n"
+        "Atentamente,\n"
+        "Seguridad Ituzaingó\n"
+        "Alan Arndt — Dueño de la Empresa\n"
+        f"Tel.: {CONTACTO_TELEFONO or '-'}\n"
+        f"Email: {EMAIL_EMPRESA or '-'}\n"
+    )
 
-        # Enviar al cliente
-        if email:
-            correo_util.enviar_email(email, asunto, cuerpo, adjunto)
+    # Enviar al cliente
+    if email and correo_util:
+        correo_util.enviar_email(email, asunto, cuerpo, adjunto)
 
-        # Copia a la empresa
-        if EMAIL_EMPRESA:
-            correo_util.enviar_email(
-                EMAIL_EMPRESA,
-                "Nuevo contrato firmado - Seguridad Ituzaingó",
-                f"El/La cliente {nombre} firmó un contrato.\n\n{cuerpo}",
-                adjunto
-            )
-    except Exception:
-        # No interrumpir la UX si falla el SMTP
-        pass
+    # Copia a la empresa
+    if EMAIL_EMPRESA and correo_util:
+        correo_util.enviar_email(
+            EMAIL_EMPRESA,
+            "Nuevo contrato firmado - Seguridad Ituzaingó",
+            f"El/La cliente {nombre} firmó un contrato.\n\n{cuerpo}",
+            adjunto
+        )
+except Exception:
+    # No interrumpir la UX si falla el SMTP
+    pass
 
     # 7) Página de agradecimiento con descarga
     return render_template("agradecimiento.html", telefono=CONTACTO_TELEFONO)
@@ -407,6 +407,7 @@ def descargar():
 # =========================================================
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
