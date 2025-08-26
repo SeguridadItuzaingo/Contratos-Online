@@ -269,33 +269,31 @@ def index():
 @app.route("/generar", methods=["POST"])
 def generar():
     # 1) Validación básica
-nombre = request.form.get("nombre", "").strip()
-dni = request.form.get("dni", "").strip()
-email = (request.form.get("email") or request.form.get("correo") or request.form.get("mail") or "").strip()
+    nombre = request.form.get("nombre", "").strip()
+    dni = request.form.get("dni", "").strip()
+    email = (request.form.get("email") or request.form.get("correo") or request.form.get("mail") or "").strip()
 
-# Domicilio del abonado
-ubicacion = request.form.get("ubicacion", "").strip()
+    # Domicilio del abonado
+    ubicacion = request.form.get("ubicacion", "").strip()
 
-# Lugar monitoreado
-ubicacion_monitoreo = request.form.get("ubicacion_monitoreo", "").strip()
+    # Lugar monitoreado
+    ubicacion_monitoreo = request.form.get("ubicacion_monitoreo", "").strip()
 
-firma_b64 = (request.form.get("firmaBase64") or request.form.get("firma") or "").strip()
+    firma_b64 = (request.form.get("firmaBase64") or request.form.get("firma") or "").strip()
 
-# (Opcional) Log rápido para verificar que llegan los dos valores
-app.logger.info(f"[DBG] ubicacion='{ubicacion}' | ubicacion_monitoreo='{ubicacion_monitoreo}'")
-
+    # Revisión de faltantes
     faltantes = [k for k, v in {
-    "nombre": nombre,
-    "dni": dni,
-    "email": email,
-    "ubicacion": ubicacion,                       # domicilio del abonado
-    "ubicacion_monitoreo": ubicacion_monitoreo,   # lugar monitoreado
-    "firma": firma_b64
-}.items() if not v]
-if faltantes:
-    return f"Faltan campos obligatorios: {', '.join(faltantes)}", 400
+        "nombre": nombre,
+        "dni": dni,
+        "email": email,
+        "ubicacion": ubicacion,                       # domicilio del abonado
+        "ubicacion_monitoreo": ubicacion_monitoreo,   # lugar monitoreado
+        "firma": firma_b64
+    }.items() if not v]
+    if faltantes:
+        return f"Faltan campos obligatorios: {', '.join(faltantes)}", 400
     
-    # 2) Preparar rutas de salida
+        # 2) Preparar rutas de salida
     slug = f"{_slug(nombre)}_{_now_tag()}_{uuid4().hex[:6]}"
     out_docx = os.path.join(STATIC_DIR, f"{slug}.docx")
     out_pdf = os.path.join(STATIC_DIR, f"{slug}.pdf")
@@ -315,14 +313,14 @@ if faltantes:
         return f"No se pudo abrir la plantilla del contrato: {e}", 500
 
     mapping = {
-    "{{ nombre }}": nombre,
-    "{{ dni }}": dni,
-    "{{ email }}": email,
-    "{{ ubicacion }}": ubicacion,                         # domicilio del abonado
-    "{{ ubicacion_monitoreo }}": ubicacion_monitoreo,     # lugar monitoreado
-    "{{ fecha_hoy }}": datetime.now().strftime("%d/%m/%Y"),
-}
-_insert_text_placeholders(doc, mapping)
+        "{{ nombre }}": nombre,
+        "{{ dni }}": dni,
+        "{{ email }}": email,
+        "{{ ubicacion }}": ubicacion,                         # domicilio del abonado
+        "{{ ubicacion_monitoreo }}": ubicacion_monitoreo,     # lugar monitoreado
+        "{{ fecha_hoy }}": datetime.now().strftime("%d/%m/%Y"),
+    }
+    _insert_text_placeholders(doc, mapping)
     
     # 3.c) Firmas (cliente + empresa)
     _ensure_company_signature(FIRMA_EMPRESA_PATH)
@@ -409,6 +407,7 @@ def descargar():
 # =========================================================
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
