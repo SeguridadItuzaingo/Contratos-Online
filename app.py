@@ -269,20 +269,31 @@ def index():
 @app.route("/generar", methods=["POST"])
 def generar():
     # 1) Validación básica
-    nombre = request.form.get("nombre", "").strip()
-    dni = request.form.get("dni", "").strip()
-    email = (request.form.get("email") or request.form.get("correo") or request.form.get("mail") or "").strip()
-    ubicacion = request.form.get("ubicacion", "").strip()  # domicilio del abonado
-    ubicacion_monitoreo = request.form.get("ubicacion_monitoreo", "").strip()  # lugar monitoreado
-    firma_b64 = (request.form.get("firmaBase64") or request.form.get("firma") or "").strip()
+nombre = request.form.get("nombre", "").strip()
+dni = request.form.get("dni", "").strip()
+email = (request.form.get("email") or request.form.get("correo") or request.form.get("mail") or "").strip()
+
+# Domicilio del abonado
+ubicacion = request.form.get("ubicacion", "").strip()
+
+# Lugar monitoreado
+ubicacion_monitoreo = request.form.get("ubicacion_monitoreo", "").strip()
+
+firma_b64 = (request.form.get("firmaBase64") or request.form.get("firma") or "").strip()
+
+# (Opcional) Log rápido para verificar que llegan los dos valores
+app.logger.info(f"[DBG] ubicacion='{ubicacion}' | ubicacion_monitoreo='{ubicacion_monitoreo}'")
 
     faltantes = [k for k, v in {
-    "nombre": nombre, "dni": dni,
+    "nombre": nombre,
+    "dni": dni,
     "email": email,
-    "ubicacion": ubicacion,                     # domicilio del abonado
-    "ubicacion_monitoreo": ubicacion_monitoreo, # lugar monitoreado
+    "ubicacion": ubicacion,                       # domicilio del abonado
+    "ubicacion_monitoreo": ubicacion_monitoreo,   # lugar monitoreado
     "firma": firma_b64
 }.items() if not v]
+if faltantes:
+    return f"Faltan campos obligatorios: {', '.join(faltantes)}", 400
     
     # 2) Preparar rutas de salida
     slug = f"{_slug(nombre)}_{_now_tag()}_{uuid4().hex[:6]}"
@@ -307,12 +318,12 @@ def generar():
     "{{ nombre }}": nombre,
     "{{ dni }}": dni,
     "{{ email }}": email,
-    "{{ ubicacion }}": ubicacion,
-    "{{ ubicacion_monitoreo }}": ubicacion_monitoreo,
+    "{{ ubicacion }}": ubicacion,                         # domicilio del abonado
+    "{{ ubicacion_monitoreo }}": ubicacion_monitoreo,     # lugar monitoreado
     "{{ fecha_hoy }}": datetime.now().strftime("%d/%m/%Y"),
 }
-    _insert_text_placeholders(doc, mapping)
-
+_insert_text_placeholders(doc, mapping)
+    
     # 3.c) Firmas (cliente + empresa)
     _ensure_company_signature(FIRMA_EMPRESA_PATH)
     _add_signatures_section(doc, firma_cliente_path, FIRMA_EMPRESA_PATH)
@@ -354,17 +365,18 @@ def generar():
     try:
         adjunto = session["archivo_pdf"]
         asunto = "Contrato firmado - Seguridad Ituzaingó"
-        cuerpo = (
-            f"Estimado/a {nombre},\n\n"
-            f"Adjuntamos el contrato firmado correspondiente al servicio de monitoreo en {ubicacion}.\n"
-            f"Le recomendamos conservar el archivo para su referencia.\n\n"
-            "Quedamos a disposición por cualquier consulta.\n\n"
-            "Atentamente,\n"
-            "Seguridad Ituzaingó\n"
-            "Alan Arndt — Dueño de la Empresa\n"
-            f"Tel.: {CONTACTO_TELEFONO or '-'}\n"
-            f"Email: {EMAIL_EMPRESA or '-'}\n"
-        )
+cuerpo = (
+    f"Estimado/a {nombre},\n\n"
+    f"Adjuntamos el contrato firmado correspondiente al servicio de monitoreo en {ubicacion_monitoreo}.\n"
+    f"Domicilio del abonado: {ubicacion}.\n"
+    "Le recomendamos conservar el archivo para su referencia.\n\n"
+    "Quedamos a disposición por cualquier consulta.\n\n"
+    "Atentamente,\n"
+    "Seguridad Ituzaingó\n"
+    "Alan Arndt — Dueño de la Empresa\n"
+    f"Tel.: {CONTACTO_TELEFONO or '-'}\n"
+    f"Email: {EMAIL_EMPRESA or '-'}\n"
+)
 
         # Enviar al cliente
         if email:
@@ -397,6 +409,7 @@ def descargar():
 # =========================================================
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
