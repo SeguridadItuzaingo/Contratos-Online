@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Contrato Digital</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
     <style>
@@ -265,6 +266,60 @@
                 grid-template-columns: 1fr
             }
         }
+        /* Tipografía fluida y contenedor */
+html { font-size: 16px; }
+body { font-size: clamp(15px, 1rem + 0.1vw, 17px); }
+
+.wrap { max-width: 980px; margin: 40px auto; padding: 0 16px; }
+
+/* Form: 1 columna por defecto; 2 columnas desde 900px */
+.form { display: grid; gap: 16px; grid-template-columns: 1fr; }
+.form .full { grid-column: 1 / -1; }
+
+@media (min-width: 900px) {
+  .form { grid-template-columns: 1fr 1fr; }
+}
+
+/* Contrato: legible y con alto relativo en móvil */
+.contrato-texto { font-size: clamp(15px, 0.95rem + 0.2vw, 16.5px); line-height: 1.65; }
+#visorContrato { max-height: 60vh; } /* usa alto de pantalla, mejor en célular */
+
+@media (min-width: 900px) {
+  #visorContrato { max-height: 520px; }
+}
+
+/* Card y paddings más compactos en móvil */
+@media (max-width: 760px) {
+  .wrap { margin: 16px auto; padding: 0 10px; }
+  .card { padding: 20px; border-radius: 12px; }
+}
+
+/* Logo responsive */
+.brand img { max-width: 60vw; height: auto; max-height: 72px; }
+
+/* Botón de enviar cómodo en móvil */
+.submit { width: 100%; max-width: 320px; }
+@media (max-width: 760px) {
+  .submit { max-width: 100%; font-size: 16px; padding: 16px; }
+}
+
+/* Canvas de firma: ocupa ancho, mantiene proporción y baja la altura en móvil */
+#firmaCanvas {
+  width: 100%;
+  max-width: 520px;
+  aspect-ratio: 13 / 5; /* mantiene proporción */
+  height: auto;         /* deja que el alto lo calcule el aspect-ratio */
+}
+
+@media (max-width: 760px) {
+  #firmaCanvas { max-width: 100%; }
+}
+
+/* Barra de progreso siempre visible pero fina en móvil */
+.progressbar { position: sticky; top: 0; height: 4px; }
+
+/* Inputs cómodos para dedo */
+input { font-size: 16px; padding: 12px; } /* evita zoom automático en iOS */
     </style>
 </head>
 <body>
@@ -501,5 +556,6 @@
     </script>
 </body>
 </html>
+
 
 
