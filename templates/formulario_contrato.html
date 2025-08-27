@@ -477,6 +477,9 @@ input { font-size: 16px; padding: 12px; } /* evita zoom automático en iOS */
             }
             window.addEventListener('resize', () => { resizeCanvas(); });
             resizeCanvas();
+            window.addEventListener('orientationchange', () => {
+  setTimeout(resizeCanvas, 150); // tras el giro, reencuadra tamaño/DPR
+});
 
             function getPos(e) {
                 const rect = canvas.getBoundingClientRect();
@@ -556,6 +559,7 @@ input { font-size: 16px; padding: 12px; } /* evita zoom automático en iOS */
     </script>
 </body>
 </html>
+
 
 
 
