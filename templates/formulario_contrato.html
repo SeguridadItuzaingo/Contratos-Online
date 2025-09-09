@@ -541,38 +541,21 @@ input { font-size: 16px; padding: 12px; } /* evita zoom automático en iOS */
             function clearSignature() { paths.length = 0; currentPath = []; hasInk = false; redrawAll(); hiddenInput.value = ""; canvas.classList.remove('error-border'); }
             function undoSignature() { if (!paths.length) return; paths.pop(); hasInk = paths.length > 0; redrawAll(); }
             
-            document.getElementById("btnClear").addEventListener('click', clearSignature);
-document.getElementById("btnUndo").addEventListener('click', undoSignature);
+                        document.getElementById("btnClear").addEventListener('click', clearSignature);
+            document.getElementById("btnUndo").addEventListener('click', undoSignature);
 
-/* Validación envío + bloqueo de doble submit */
-const form = document.getElementById("formulario");
-let submitted = false;
-
-form.addEventListener("submit", (e) => {
-  // si ya se envió, frenamos el doble click/tap
-  if (submitted) {
-    e.preventDefault();
-    return false;
-  }
-
-  // exportar la firma si el botón está habilitado
-  if (!btnSubmit.disabled) {
-    hiddenInput.value = hasInk ? exportSignature() : "";
-  }
-
-  // exigir firma
-  if (!hasInk) {
-    e.preventDefault();
-    canvas.classList.add("error-border");
-    alert("Por favor, dibuje su firma antes de enviar el contrato.");
-    canvas.scrollIntoView({ behavior: "smooth", block: "center" });
-    return false;
-  }
-
-  // primera vez: marcamos como enviado y bloqueamos UI
-  submitted = true;
-  btnSubmit.disabled = true;
-  btnSubmit.textContent = "Generando contrato…";
-});
-
-}); // <- cierra el DOMContentLoaded
+            /* Validación envío */
+            document.getElementById("formulario").addEventListener("submit", (e) => {
+                if (!btnSubmit.disabled) hiddenInput.value = hasInk ? exportSignature() : "";
+                if (!hasInk) {
+                    e.preventDefault();
+                    canvas.classList.add("error-border");
+                    alert("Por favor, dibuje su firma antes de enviar el contrato.");
+                    canvas.scrollIntoView({ behavior: "smooth", block: "center" });
+                    return false;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
