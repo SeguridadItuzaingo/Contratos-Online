@@ -271,7 +271,14 @@ def generar():
     # 1) Lectura de campos
     nombre = request.form.get("nombre", "").strip()
     dni = request.form.get("dni", "").strip()
-    email = (request.form.get("email") or request.form.get("correo") or request.form.get("mail") or "").strip()
+    email = (
+    request.form.get("email")
+    or request.form.get("email_cliente")
+    or request.form.get("correo")
+    or request.form.get("mail")
+    or request.form.get("cliente_email")
+    or ""
+).strip().lower()
 
     # Domicilio del abonado
     ubicacion = request.form.get("ubicacion", "").strip()
@@ -291,6 +298,10 @@ def generar():
     }.items() if not v]
     if faltantes:
         return f"Faltan campos obligatorios: {', '.join(faltantes)}", 400
+        # Validación simple de formato de email
+import re
+if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+    return "El email del cliente no es válido.", 400
 
     # 2) Preparar rutas de salida
     slug = f"{_slug(nombre)}_{_now_tag()}_{uuid4().hex[:6]}"
@@ -356,33 +367,28 @@ def generar():
         app.logger.info(f"[Drive] Subido OK. fileId={drive_id}")
     except Exception as e:
         app.logger.exception(f"[Drive] Falló la subida: {e}")
+app.logger.info(f"[Contrato] Enviar a cliente: {email} | CC empresa: {EMAIL_EMPRESA}")
 
     # 6) Enviar correos (no interrumpe si falla)
     try:
         adjunto = session["archivo_pdf"]
-        asunto = "Contrato firmado - Seguridad Ituzaingó"
-        cuerpo = (
-            f"Estimado/a {nombre},\n\n"
-            f"Adjuntamos el contrato firmado correspondiente al servicio de monitoreo en {ubicacion_monitoreo}.\n"
-            f"Domicilio del abonado: {ubicacion}.\n"
-            "Le recomendamos conservar el archivo para su referencia.\n\n"
-            "Quedamos a disposición por cualquier consulta.\n\n"
-            "Atentamente,\n"
-            "Seguridad Ituzaingó\n"
-            "Alan Arndt — Dueño de la Empresa\n"
-            f"Tel.: {CONTACTO_TELEFONO or '-'}\n"
-            f"Email: {EMAIL_EMPRESA or '-'}\n"
-        )
+asunto = "Contrato firmado - Seguridad Ituzaingó"
+cuerpo = (
+    f"Estimado/a {nombre},\n\n"
+    f"Adjuntamos el contrato firmado correspondiente al servicio de monitoreo en {ubicacion_monitoreo}.\n"
+    f"Domicilio del abonado: {ubicacion}.\n"
+    "Le recomendamos conservar el archivo para su referencia.\n\n"
+    "Quedamos a disposición por cualquier consulta.\n\n"
+    "Atentamente,\n"
+    "Seguridad Ituzaingó\n"
+    "Alan Arndt — Dueño de la Empresa\n"
+    f"Tel.: {CONTACTO_TELEFONO or '-'}\n"
+    f"Email: {EMAIL_EMPRESA or '-'}\n"
+)
 
-        if email:
-            correo_util.enviar_email(email, asunto, cuerpo, adjunto)
-        if EMAIL_EMPRESA:
-            correo_util.enviar_email(
-                EMAIL_EMPRESA,
-                "Nuevo contrato firmado - Seguridad Ituzaingó",
-                f"El/La cliente {nombre} firmó un contrato.\n\n{cuerpo}",
-                adjunto
-            )
+# Un solo envío: TO = cliente; el CC a la empresa lo agrega correo_util vía CC_EMPRESA del .env
+correo_util.enviar_email(email, asunto, cuerpo, adjunto)
+
     except Exception:
         pass
 
@@ -401,6 +407,7 @@ def descargar():
 # =========================================================
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
