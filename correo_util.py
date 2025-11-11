@@ -1,50 +1,57 @@
+# correo_util.py — Envío por API HTTP (SendGrid), sin SMTP
 import os
-import smtplib
-import mimetypes
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
+import base64
+import json
+import requests
+
+PROVIDER = os.getenv("EMAIL_PROVIDER", "sendgrid").lower()
+FROM_EMAIL = os.getenv("FROM_EMAIL", "no-reply@seguridadituzaingo.com")
+CC_EMPRESA = os.getenv("CC_EMPRESA")  # opcional
+
+class EmailError(Exception):
+    pass
+
+def _enviar_sendgrid(to_email, subject, body_text, attachment_path):
+    api_key = os.getenv("SENDGRID_API_KEY")
+    if not api_key:
+        raise EmailError("Falta SENDGRID_API_KEY en variables de entorno")
+
+    data = {
+        "personalizations": [{
+            "to": [{"email": to_email}],
+            "subject": subject
+        }],
+        "from": {"email": FROM_EMAIL},
+        "content": [{"type": "text/plain", "value": body_text or ""}]
+    }
+
+    if CC_EMPRESA:
+        data["personalizations"][0]["cc"] = [{"email": CC_EMPRESA}]
+
+    if attachment_path:
+        with open(attachment_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("utf-8")
+        data.setdefault("attachments", []).append({
+            "content": b64,
+            "type": "application/pdf",
+            "filename": os.path.basename(attachment_path),
+            "disposition": "attachment"
+        })
+
+    resp = requests.post(
+        "https://api.sendgrid.com/v3/mail/send",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        },
+        data=json.dumps(data),
+        timeout=15
+    )
+    if resp.status_code >= 300:
+        raise EmailError(f"SendGrid error {resp.status_code}: {resp.text}")
 
 def enviar_email(destinatario, asunto, cuerpo="Adjunto el contrato firmado.", adjunto_path=None):
-    remitente = os.getenv("EMAIL_REMITENTE")
-    clave = os.getenv("EMAIL_CLAVE")
-    if not remitente or not clave:
-        raise RuntimeError("Falta EMAIL_REMITENTE o EMAIL_CLAVE en .env")
-
-    # Mensaje base
-    msg = MIMEMultipart()
-    msg["From"] = remitente
-    msg["To"] = destinatario
-    msg["Subject"] = asunto
-    msg.attach(MIMEText(cuerpo, "plain", "utf-8"))
-
-    # Adjunto (usa el nombre real y extensi�n correcta: .pdf o .docx)
-    if adjunto_path:
-        fname = os.path.basename(adjunto_path)
-        ctype, _ = mimetypes.guess_type(adjunto_path)
-        if ctype is None:
-            ctype = "application/octet-stream"
-        with open(adjunto_path, "rb") as f:
-            part = MIMEApplication(f.read(), Name=fname)
-        part.add_header("Content-Disposition", "attachment", filename=fname)
-        msg.attach(part)
-
-    # SMTP configurable por .env (Gmail por defecto)
-    host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    use_tls = os.getenv("SMTP_TLS", "false").lower() in ("1", "true", "yes", "on")
-    # STARTTLS suele ser 587; SSL directo suele ser 465
-    port = int(os.getenv("SMTP_PORT", "587" if use_tls else "465"))
-
-    if use_tls:
-        # STARTTLS
-        with smtplib.SMTP(host, port, timeout=30) as s:
-            s.starttls()
-            s.login(remitente, clave)
-            s.send_message(msg)
-    else:
-        # SSL directo
-        with smtplib.SMTP_SSL(host, port, timeout=30) as s:
-            s.login(remitente, clave)
-            s.send_message(msg)
-
-
+    """Envía correo usando API HTTP (SendGrid). Evita SMTP bloqueado en Render."""
+    if PROVIDER == "sendgrid":
+        return _enviar_sendgrid(destinatario, asunto, cuerpo, adjunto_path)
+    raise EmailError(f"Proveedor no soportado: {PROVIDER}")
