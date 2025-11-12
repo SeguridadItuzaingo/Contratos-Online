@@ -407,8 +407,20 @@ def descargar():
 # =========================================================
 # Main (solo desarrollo; en Render se usa gunicorn)
 # =========================================================
+@app.route("/test-mail")
+def test_mail():
+    from correo_util import enviar_email
+    import os
+    ok, info = enviar_email(
+        os.environ.get("EMAIL_EMPRESA"),
+        "Prueba Brevo OK",
+        "Esto es una prueba sin adjunto."
+    )
+    return {"ok": ok, "info": info}, (200 if ok else 500)
+    
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
