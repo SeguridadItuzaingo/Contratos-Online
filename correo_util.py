@@ -4,7 +4,7 @@ import os, base64, json, logging, mimetypes, requests
 BREVO_API_KEY   = os.environ.get("BREVO_API_KEY")
 FROM_EMAIL      = os.environ.get("FROM_EMAIL", "no-reply@seguridadituzaingo.com")
 FROM_NAME       = os.environ.get("FROM_NAME", "Seguridad Ituzaingó")
-CC_EMPRESA      = os.environ.get("CC_EMPRESA")  # ej: alanarndt@seguridadituzaingo.com
+CC_EMPRESA      = os.environ.get("CC_EMPRESA")  # ej: administracion@seguridadituzaingo.com
 CONTACTO_TEL    = os.environ.get("CONTACTO_TELEFONO", "")
 
 BREVO_URL = "https://api.brevo.com/v3/smtp/email"
@@ -79,3 +79,4 @@ def enviar_email(to, asunto, cuerpo_texto, adjunto_path=None, cc=None, reply_to=
     except Exception as e:
         logging.exception("[Brevo] Excepción enviando email")
         return False, str(e)
+
