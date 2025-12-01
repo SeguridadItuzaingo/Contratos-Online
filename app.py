@@ -372,7 +372,7 @@ def generar():
     # Log de destinatarios
     app.logger.info(f"[Contrato] Enviar a cliente: {email} | CC empresa: {EMAIL_EMPRESA}")
 
-    # 6) Enviar correos (no interrumpe si falla)
+        # 6) Enviar correos (no interrumpe si falla)
     try:
         adjunto = session["archivo_pdf"]
         asunto = "Contrato firmado - Seguridad Ituzaingó"
@@ -389,8 +389,29 @@ def generar():
             f"Email: {EMAIL_EMPRESA or '-'}\n"
         )
 
-        # Un solo envío: TO = cliente; el CC lo agrega correo_util vía CC_EMPRESA en .env
-        correo_util.enviar_email(email, asunto, cuerpo, adjunto)
+        # Envío al cliente (CC lo agrega correo_util vía CC_EMPRESA en .env)
+        ok_cli, info_cli = correo_util.enviar_email(
+            email,
+            asunto,
+            cuerpo,
+            adjunto_path=adjunto
+        )
+
+        # Copia directa a la empresa (además del CC, si querés)
+        if EMAIL_EMPRESA:
+            ok_emp, info_emp = correo_util.enviar_email(
+                EMAIL_EMPRESA,
+                asunto,
+                cuerpo,
+                adjunto_path=adjunto
+            )
+        else:
+            ok_emp, info_emp = None, "EMAIL_EMPRESA vacío"
+
+        # Logs para ver qué dice Brevo
+        app.logger.info("ENVIO CLIENTE: ok=%s info=%s", ok_cli, info_cli)
+        app.logger.info("ENVIO EMPRESA: ok=%s info=%s", ok_emp, info_emp)
+
     except Exception as e:
         app.logger.exception(f"[Email] Falló el envío: {e}")
 
@@ -420,6 +441,7 @@ def test_mail():
     
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
