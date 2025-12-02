@@ -372,7 +372,7 @@ def generar():
     # Log de destinatarios
     app.logger.info(f"[Contrato] Enviar a cliente: {email} | CC empresa: {EMAIL_EMPRESA}")
 
-            # 6) Enviar correos (no interrumpe si falla)
+    # 6) Enviar correos (no interrumpe si falla)
     adjunto = session["archivo_pdf"]
     asunto = "Contrato firmado - Seguridad Ituzaingó"
     cuerpo = (
@@ -410,41 +410,12 @@ def generar():
         else:
             ok_emp, info_emp = None, "EMAIL_EMPRESA vacío"
 
+        # Logs por si después querés revisar en Render
+        app.logger.info("ENVIO CLIENTE: ok=%s info=%s", ok_cli, info_cli)
+        app.logger.info("ENVIO EMPRESA: ok=%s info=%s", ok_emp, info_emp)
+
     except Exception as e:
-        ok_cli, info_cli = False, f"Excepción: {e}"
-        ok_emp, info_emp = False, f"Excepción: {e}"
+        app.logger.exception(f"[Email] Falló el envío: {e}")
 
-        # 7) Página de diagnóstico de envío (temporal)
-    return f"""
-    <h2>Contrato generado correctamente ✅</h2>
-    <p>El archivo se subió a Drive y quedó listo para descargar.</p>
-    <hr>
-    <h3>Resultado envío de email (cliente)</h3>
-    <p>ok_cli: {ok_cli}</p>
-    <p>info_cli: {info_cli}</p>
-    <hr>
-    <h3>Resultado envío de email (empresa)</h3>
-    <p>ok_emp: {ok_emp}</p>
-    <p>info_emp: {info_emp}</p>
-    <hr>
-    <p>Cuando me pases este texto, volvemos a poner la página de agradecimiento linda 😉</p>
-    """
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    # 7) Página de agradecimiento profesional
+    return render_template("agradecimiento.html", telefono=CONTACTO_TELEFONO)
