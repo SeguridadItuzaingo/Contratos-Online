@@ -372,23 +372,25 @@ def generar():
     # Log de destinatarios
     app.logger.info(f"[Contrato] Enviar a cliente: {email} | CC empresa: {EMAIL_EMPRESA}")
 
-        # 6) Enviar correos (no interrumpe si falla)
-    try:
-        adjunto = session["archivo_pdf"]
-        asunto = "Contrato firmado - Seguridad Ituzaingó"
-        cuerpo = (
-            f"Estimado/a {nombre},\n\n"
-            f"Adjuntamos el contrato firmado correspondiente al servicio de monitoreo en {ubicacion_monitoreo}.\n"
-            f"Domicilio del abonado: {ubicacion}.\n"
-            "Le recomendamos conservar el archivo para su referencia.\n\n"
-            "Quedamos a disposición por cualquier consulta.\n\n"
-            "Atentamente,\n"
-            "Seguridad Ituzaingó\n"
-            "Alan Arndt — Dueño de la Empresa\n"
-            f"Tel.: {CONTACTO_TELEFONO or '-'}\n"
-            f"Email: {EMAIL_EMPRESA or '-'}\n"
-        )
+            # 6) Enviar correos (no interrumpe si falla)
+    adjunto = session["archivo_pdf"]
+    asunto = "Contrato firmado - Seguridad Ituzaingó"
+    cuerpo = (
+        f"Estimado/a {nombre},\n\n"
+        f"Adjuntamos el contrato firmado correspondiente al servicio de monitoreo en {ubicacion_monitoreo}.\n"
+        f"Domicilio del abonado: {ubicacion}.\n"
+        "Le recomendamos conservar el archivo para su referencia.\n\n"
+        "Quedamos a disposición por cualquier consulta.\n\n"
+        "Atentamente,\n"
+        "Seguridad Ituzaingó\n"
+        "Alan Arndt — Dueño de la Empresa\n"
+        f"Tel.: {CONTACTO_TELEFONO or '-'}\n"
+        f"Email: {EMAIL_EMPRESA or '-'}\n"
+    )
 
+    ok_cli = info_cli = ok_emp = info_emp = None
+
+    try:
         # Envío al cliente (CC lo agrega correo_util vía CC_EMPRESA en .env)
         ok_cli, info_cli = correo_util.enviar_email(
             email,
@@ -408,39 +410,27 @@ def generar():
         else:
             ok_emp, info_emp = None, "EMAIL_EMPRESA vacío"
 
-        # Logs para ver qué dice Brevo
-        app.logger.info("ENVIO CLIENTE: ok=%s info=%s", ok_cli, info_cli)
-        app.logger.info("ENVIO EMPRESA: ok=%s info=%s", ok_emp, info_emp)
-
     except Exception as e:
-        app.logger.exception(f"[Email] Falló el envío: {e}")
+        ok_cli, info_cli = False, f"Excepción: {e}"
+        ok_emp, info_emp = False, f"Excepción: {e}"
 
-    # 7) Página de agradecimiento
-    return render_template("agradecimiento.html", telefono=CONTACTO_TELEFONO)
+        # 7) Página de diagnóstico de envío (temporal)
+    return f"""
+    <h2>Contrato generado correctamente ✅</h2>
+    <p>El archivo se subió a Drive y quedó listo para descargar.</p>
+    <hr>
+    <h3>Resultado envío de email (cliente)</h3>
+    <p>ok_cli: {ok_cli}</p>
+    <p>info_cli: {info_cli}</p>
+    <hr>
+    <h3>Resultado envío de email (empresa)</h3>
+    <p>ok_emp: {ok_emp}</p>
+    <p>info_emp: {info_emp}</p>
+    <hr>
+    <p>Cuando me pases este texto, volvemos a poner la página de agradecimiento linda 😉</p>
+    """
 
-@app.route("/descargar", methods=["GET"])
-def descargar():
-    archivo = session.get("archivo_pdf")
-    if not archivo or not os.path.exists(archivo):
-        return "Error: No se encontró el contrato para descargar.", 404
-    return send_file(archivo, as_attachment=True, download_name=os.path.basename(archivo))
 
-# =========================================================
-# Main (solo desarrollo; en Render se usa gunicorn)
-# =========================================================
-@app.route("/test-mail")
-def test_mail():
-    from correo_util import enviar_email
-    import os
-    ok, info = enviar_email(
-        os.environ.get("EMAIL_EMPRESA"),
-        "Prueba Brevo OK",
-        "Esto es una prueba sin adjunto."
-    )
-    return {"ok": ok, "info": info}, (200 if ok else 500)
-    
-if __name__ == "__main__":
-    app.run(debug=True)
 
 
 
